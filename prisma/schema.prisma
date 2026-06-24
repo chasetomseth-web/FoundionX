@@ -1,0 +1,1914 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum FunnelStepType {
+  upsell
+  downsell
+  cross_sell
+  order_bump
+
+  @@map("funnel_step_type")
+}
+
+enum UpsellChargeStatus {
+  pending
+  succeeded
+  failed
+  declined
+
+  @@map("upsell_charge_status")
+}
+
+enum UpsellSessionStatus {
+  active
+  completed
+  expired
+
+  @@map("upsell_session_status")
+}
+
+// ============================================================
+// USER & AUTH
+// ============================================================
+
+model Organization {
+  id                   String               @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name                 String
+  slug                 String               @unique
+  plan                 String               @default("starter")
+  status               String               @default("active")
+  stripeCustomerId     String?              @unique
+  stripeSubscriptionId String?              @unique
+  trialEndsAt          DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  users                UserOrganization[]
+  stores               Store[]
+  apiKeys              ApiKey[]
+  webhookEvents        WebhookEvent[]
+  backgroundJobs       BackgroundJob[]
+  notifications        Notification[]
+  featureFlags         FeatureFlag[]
+  supportTickets       SupportTicket[]
+  auditLogs            AuditLog[]
+  stripeReconciliationLogs StripeReconciliationLog[]
+  sites                Site[]
+  domains              Domain[]
+
+  @@index([slug])
+}
+
+// ============================================================
+// SITES & DOMAINS (Custom Domain Hosting)
+// ============================================================
+
+model Site {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String
+  name          String
+  slug          String
+  htmlContent   String   @db.Text
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  domains      Domain[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Domain {
+  id                String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId    String
+  siteId            String
+  hostname          String    @unique
+  vercelDomainId    String?
+  verificationState String    @default("pending")
+  sslState          String    @default("pending")
+  verificationTxt   String?
+  lastCheckedAt     DateTime?
+  errorMessage      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  site         Site         @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+model User {
+  id                 String             @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email              String             @unique
+  name               String?
+  passwordHash       String?
+  avatarUrl          String?
+  emailVerified      Boolean            @default(false)
+  mfaEnabled         Boolean            @default(false)
+  mfaSecret          String?
+  lastLoginAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organizations      UserOrganization[]
+  sessions           UserSession[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+
+  @@index([email])
+}
+
+model UserOrganization {
+  id             String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId         String
+  organizationId String
+  role           String       @default("member")
+  permissions    String[]     @default([])
+  invitedAt      DateTime?
+  joinedAt       DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model UserSession {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId    String
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model ApiKey {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String
+  name           String
+  keyHash        String   @unique
+  keyPrefix      String
+  scopes         String[] @default([])
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([organizationId])
+  @@index([keyHash])
+}
+
+// ============================================================
+// AUDIT & LOGGING
+// ============================================================
+
+model AuditLog {
+  id             String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String
+  userId         String?
+  action         String
+  resource       String
+  resourceId     String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+// ============================================================
+// STORE & MERCHANT PAGES
+// ============================================================
+
+model Store {
+  id                 String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId     String
+  name               String
+  slug               String
+  domain             String?
+  customDomain       String?
+  status             String   @default("active")
+  currency           String   @default("USD")
+  timezone           String   @default("UTC")
+  goaffproStoreId    String?
+  goaffproApiKey     String?
+  sdkInjected        Boolean  @default(false)
+  fromAddressName    String?
+  fromAddressStreet  String?
+  fromAddressCity    String?
+  fromAddressState   String?
+  fromAddressZip     String?
+  fromAddressCountry String?
+  fromAddressPhone   String?
+  gtmId              String?
+  facebookPixelId    String?
+  tiktokPixelId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization           Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  themes                 StoreTheme[]
+  htmlTemplates          HtmlTemplate[]
+  navigationMenus        NavigationMenu[]
+  seoMetadata            SeoMetadata[]
+  products               Product[]
+  collections            Collection[]
+  orders                 Order[]
+  customers              Customer[]
+  journeySteps           Json       @default("[]")
+  subscriptions          Subscription[]
+  affiliates             Affiliate[]
+  emailCampaigns         EmailCampaign[]
+  automationWorkflows    AutomationWorkflow[]
+  customerSegments       CustomerSegment[]
+  analyticsEvents        AnalyticsEvent[]
+  conversionEvents       ConversionEvent[]
+  funnelEvents           FunnelEvent[]
+  merchantPages          MerchantPage[]
+  offers                 Offer[]
+  coupons                Coupon[]
+  funnels                Funnel[]
+  checkoutSessions       CheckoutSession[]
+  uploadedAssets         UploadedAsset[]
+  pages                  Page[]
+  templates              Template[]
+  globalComponents       GlobalComponent[]
+  forms                  Form[]
+  globalData             GlobalData?
+  customVariables        CustomVariable[]
+  funnelAnalyticsEvents  FunnelAnalyticsEvent[]
+  siteComponents         SiteComponent[]
+  siteVariables          SiteVariable[]
+}
+
+model SiteComponent {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  name      String
+  slug      String
+  type      String   @default("custom")
+  html      String   @default("")
+  isGlobal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model SiteVariable {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  key       String
+  value     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId])
+}
+
+model StoreTheme {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  name      String
+  isActive  Boolean  @default(false)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model HtmlTemplate {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId        String
+  name           String
+  slug           String
+  type           String   @default("page")
+  rawHtml        String
+  sanitizedHtml  String
+  compiledHtml   String?
+  cssContent     String?
+  jsContent      String?
+  bindings       Json     @default("[]")
+  status         String   @default("draft")
+  isDefault      Boolean  @default(false)
+  seoTitle       String?
+  seoDescription String?
+  uploadedAt     DateTime @default(now())
+  publishedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+
+  store  Store           @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  blocks TemplateBlock[]
+}
+
+model TemplateBlock {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  templateId  String
+  name        String
+  type        String
+  htmlContent String
+  cssContent  String?
+  bindings    Json     @default("[]")
+  sortOrder   Int      @default(0)
+  isReusable  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template HtmlTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model UploadedAsset {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId      String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  cdnUrl       String?
+  altText      String?
+  folder       String?
+  createdAt    DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model NavigationMenu {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  name      String
+  handle    String
+  items     Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model SeoMetadata {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId       String
+  resourceType  String
+  resourceId    String
+  title         String?
+  description   String?
+  ogTitle       String?
+  ogDescription String?
+  ogImage       String?
+  canonicalUrl  String?
+  noIndex       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model MerchantPage {
+  id          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId     String
+  name        String
+  slug        String
+  type        String    @default("custom") @map("pageType")
+  html        String    @default("")
+  css         String    @default("")
+  js          String    @default("")
+  seoTitle    String?
+  seoDesc     String?
+  isCore      Boolean   @default(false)
+  isTemplate  Boolean   @default(false)
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  visibility  String    @default("public")
+  status      String    @default("draft")
+  metadata    Json      @default("{}")
+  settings    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  store        Store               @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  blocks       MerchantPageBlock[]
+  publishedPage PublishedPage?
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("MerchantPage")
+}
+
+model MerchantPageBlock {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  pageId    String
+  parentId  String?
+  order     Int      @default(0)
+  type      String
+  props     Json     @default("{}")
+  style     Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page   MerchantPage      @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  parent MerchantPageBlock? @relation("MerchantPageBlockParent", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  children MerchantPageBlock[] @relation("MerchantPageBlockParent")
+
+  @@index([pageId])
+  @@index([parentId])
+}
+
+model PublishedPage {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  merchantPageId String  @unique
+  slug          String   @unique
+  html          String
+  css           String?
+  metadata      Json?
+  publishedAt   DateTime @default(now())
+
+  merchantPage MerchantPage @relation(fields: [merchantPageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([slug])
+}
+
+// ============================================================
+// PRODUCTS
+// ============================================================
+
+model Product {
+  id               String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId          String
+  name             String
+  slug             String
+  sku              String?
+  description      String?
+  price            Decimal  @db.Decimal(10, 2)
+  compareAtPrice   Decimal? @db.Decimal(10, 2)
+  costPrice        Decimal? @db.Decimal(10, 2)
+  type             String   @default("physical")
+  status           String   @default("draft")
+  taxable          Boolean  @default(true)
+  taxCode          String?
+  weight           Decimal? @db.Decimal(8, 2)
+  weightUnit       String?  @default("lb")
+  hasUpsell        Boolean  @default(false)
+  hasOrderBump     Boolean  @default(false)
+  upsellProductId  String?
+  orderBumpProductId String?
+  stripeProductId  String?
+  stripePriceId    String?
+  metadata         Json?
+  publishedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store        Store              @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  variants     ProductVariant[]
+  images       ProductImage[]
+  files        ProductFile[]
+  inventory    Inventory[]
+  tags         ProductTag[]
+  collections  ProductCollection[]
+  offers       Offer[]
+  orderItems   OrderItem[]
+  funnelProducts FunnelProduct[]
+}
+
+model ProductVariant {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  productId       String
+  name            String
+  sku             String?
+  price           Decimal  @db.Decimal(10, 2)
+  compareAtPrice  Decimal? @db.Decimal(10, 2)
+  inventory       Int      @default(0)
+  options         Json     @default("{}")
+  stripeProductId String?
+  stripePriceId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model ProductImage {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  productId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model ProductFile {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  productId    String
+  name         String
+  url          String
+  path         String?
+  size         Int
+  contentType  String
+  createdAt    DateTime @default(now())
+
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([productId])
+}
+
+model FunnelProduct {
+  id         String                      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  funnelId   String                      @db.Uuid
+  productId  String
+  sortOrder  Int                         @default(0)
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @updatedAt
+
+  funnel     upsell_funnels              @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  product    Product                     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([funnelId, productId])
+  @@index([funnelId])
+  @@index([productId])
+}
+
+model Inventory {
+  id             String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  productId      String
+  variantId      String?
+  quantity       Int     @default(0)
+  reserved       Int     @default(0)
+  available      Int     @default(0)
+  lowStockAt     Int     @default(5)
+  trackInventory Boolean @default(true)
+  allowBackorder Boolean @default(false)
+  updatedAt      DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Collection {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId     String
+  name        String
+  slug        String
+  description String?
+  imageUrl    String?
+  status      String   @default("active")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store      Store               @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  products   ProductCollection[]
+}
+
+model ProductCollection {
+  productId    String
+  collectionId String
+  sortOrder    Int      @default(0)
+
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([productId, collectionId])
+}
+
+model ProductTag {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  productId String
+  tag       String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// ============================================================
+// ORDERS & FULFILLMENT
+// ============================================================
+
+model Order {
+  id                      String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId                 String
+  customerId              String?
+  orderNumber             String
+  status                  String          @default("pending")
+  paymentStatus           String          @default("pending")
+  fulfillmentStatus       String          @default("unfulfilled")
+  currency                String          @default("USD")
+  subtotal                Decimal         @db.Decimal(10, 2)
+  discountTotal           Decimal         @default(0) @db.Decimal(10, 2)
+  shippingTotal           Decimal         @default(0) @db.Decimal(10, 2)
+  taxTotal                Decimal         @default(0) @db.Decimal(10, 2)
+  total                   Decimal         @db.Decimal(10, 2)
+  refundedAmount          Decimal         @default(0) @db.Decimal(10, 2)
+  couponCode              String?
+  discountPercent         Decimal?        @db.Decimal(5, 2)
+  affiliateId             String?
+  affiliateCode           String?
+  isSubscriptionOrder     Boolean         @default(false)
+  subscriptionId          String?
+  stripePaymentIntentId   String?
+  stripeCheckoutSessionId String?
+  stripeCustomerId        String?
+  stripeInvoiceId         String?
+  ipAddress               String?
+  userAgent               String?
+  notes                   String?
+  metadata                Json?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items        OrderItem[]
+  fulfillments Fulfillment[]
+  shipments    Shipment[]
+  refunds      Refund[]
+  transactions Transaction[]
+  taxRecords   TaxRecord[]
+  checkoutSessions CheckoutSession[]
+}
+
+model OrderItem {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId     String
+  productId   String?
+  variantId   String?
+  name        String
+  sku         String?
+  quantity    Int
+  price       Decimal  @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  isUpsell    Boolean  @default(false)
+  isOrderBump Boolean  @default(false)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model Fulfillment {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId     String
+  status      String   @default("pending")
+  notes       String?
+  fulfilledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Refund {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId        String
+  amount         Decimal  @db.Decimal(10, 2)
+  reason         String?
+  status         String   @default("pending")
+  stripeRefundId String?
+  processedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Transaction {
+  id                      String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId                 String
+  type                    String
+  status                  String
+  amount                  Decimal  @db.Decimal(10, 2)
+  currency                String   @default("USD")
+  stripeTransactionId     String?
+  stripePaymentIntentId   String?
+  stripeChargeId          String?
+  failureCode             String?
+  failureMessage          String?
+  metadata                Json?
+  createdAt               DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model TaxRecord {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId      String
+  taxCode      String?
+  rate         Decimal  @db.Decimal(5, 4)
+  amount       Decimal  @db.Decimal(10, 2)
+  jurisdiction String?
+  createdAt    DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Shipment {
+  id                 String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId            String
+  carrier            String?
+  trackingNumber     String?
+  trackingUrl        String?
+  status             String          @default("pending")
+  shippedAt          DateTime?       @db.Timestamptz(6)
+  deliveredAt        DateTime?       @db.Timestamptz(6)
+  easypostShipmentId String?
+  easypostTrackerId  String?
+  labelUrl           String?
+  service            String?
+  rateAmount         Decimal?        @db.Decimal(10, 2)
+  labelCreatedAt     DateTime?       @db.Timestamptz(6)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @default(now()) @updatedAt @db.Timestamptz(6)
+
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trackingEvents TrackingEvent[]
+
+  @@index([orderId])
+  @@index([easypostShipmentId])
+  @@index([trackingNumber])
+}
+
+model TrackingEvent {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  shipmentId      String
+  easypostEventId String?
+  status          String
+  message         String?
+  location        String?
+  carrier         String?
+  eventTime       DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([shipmentId])
+  @@index([easypostEventId])
+}
+
+// ============================================================
+// CUSTOMERS
+// ============================================================
+
+model Customer {
+  id                String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId           String
+  email             String
+  name              String?
+  firstName         String?
+  lastName          String?
+  phone             String?
+  country           String?
+  status            String          @default("active")
+  tags              String[]        @default([])
+  notes             String?
+  stripeCustomerId  String?
+  totalSpent        Decimal         @default(0) @db.Decimal(10, 2)
+  totalOrders       Int             @default(0)
+  avgOrderValue     Decimal         @default(0) @db.Decimal(10, 2)
+  ltv               Decimal         @default(0) @db.Decimal(10, 2)
+  lastOrderAt       DateTime?
+  acceptsMarketing  Boolean         @default(false)
+  brevoContactId    String?
+  passwordHash      String?
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  store           Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  addresses       CustomerAddress[]
+  paymentMethods  CustomerPaymentMethod[]
+  sessions        CustomerSession[]
+  orders          Order[]
+  @@unique([storeId, email])
+  subscriptions   Subscription[]
+}
+
+model CustomerAddress {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  customerId String
+  type       String   @default("shipping")
+  isDefault  Boolean  @default(false)
+  firstName  String?
+  lastName   String?
+  company    String?
+  address1   String
+  address2   String?
+  city       String
+  state      String?
+  zip        String?
+  country    String
+  phone      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CustomerPaymentMethod {
+  id                    String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  customerId            String
+  stripePaymentMethodId String
+  type                  String
+  brand                 String?
+  last4                 String?
+  expMonth              Int?
+  expYear               Int?
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CustomerSession {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  customerId String
+  token     String
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// ============================================================
+// SUBSCRIPTIONS
+// ============================================================
+
+model Subscription {
+  id                 String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId            String?
+  customerId         String
+  productId          String?
+  status             String          @default("active")
+  planName           String
+  amount             Decimal         @db.Decimal(10, 2)
+  currency           String          @default("USD")
+  interval           String          @default("month")
+  intervalCount      Int             @default(1)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean         @default(false)
+  canceledAt         DateTime?
+  trialStart         DateTime?
+  trialEnd           DateTime?
+  stripeSubscriptionId String?
+  stripeCustomerId   String?
+  stripePriceId      String?
+  stripeProductId    String?
+  failedPaymentCount Int             @default(0)
+  lastPaymentAt      DateTime?
+  nextBillingAt      DateTime?
+  metadata           Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  customer     Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  store        Store?                  @relation(fields: [storeId], references: [id])
+  invoices     SubscriptionInvoice[]
+  payments     SubscriptionPayment[]
+  retryAttempts SubscriptionRetryAttempt[]
+}
+
+model SubscriptionInvoice {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  subscriptionId  String
+  stripeInvoiceId String?
+  status          String
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  periodStart     DateTime
+  periodEnd       DateTime
+  paidAt          DateTime?
+  dueDate         DateTime?
+  hostedInvoiceUrl String?
+  invoicePdf      String?
+  createdAt       DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model SubscriptionPayment {
+  id                    String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  subscriptionId        String
+  amount                Decimal  @db.Decimal(10, 2)
+  currency              String   @default("USD")
+  status                String
+  stripePaymentIntentId String?
+  stripeChargeId        String?
+  failureCode           String?
+  failureMessage        String?
+  paidAt                DateTime?
+  createdAt             DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model SubscriptionRetryAttempt {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  subscriptionId String
+  attemptNumber  Int
+  status         String
+  scheduledAt    DateTime
+  attemptedAt    DateTime?
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// ============================================================
+// AFFILIATES (legacy — dropped in last migration)
+// ============================================================
+
+model Affiliate {
+  id                 String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId            String
+  userId             String?
+  email              String
+  name               String
+  status             String          @default("pending")
+  tier               String          @default("standard")
+  commissionRate     Decimal         @default(0.10) @db.Decimal(5, 4)
+  recurringCommission Boolean        @default(false)
+  recurringRate      Decimal?        @db.Decimal(5, 4)
+  goaffproAffiliateId String?
+  referralCode       String
+  customLinks        Json            @default("[]")
+  totalEarned        Decimal         @default(0) @db.Decimal(10, 2)
+  totalPaid          Decimal         @default(0) @db.Decimal(10, 2)
+  pendingBalance     Decimal         @default(0) @db.Decimal(10, 2)
+  totalReferrals     Int             @default(0)
+  totalConversions   Int             @default(0)
+  paypalEmail        String?
+  bankDetails        Json?
+  metadata           Json?
+  joinedAt           DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  store      Store              @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  links      AffiliateLink[]
+  commissions AffiliateCommission[]
+  payouts    AffiliatePayout[]
+  referrals  AffiliateReferral[]
+  campaigns  AffiliateCampaign[]
+  clicks     AffiliateClick[]
+
+  @@index([goaffproAffiliateId])
+  @@index([status])
+  @@index([referralCode])
+}
+
+model AffiliateLink {
+  id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId String
+  url         String
+  slug        String
+  label       String?
+  clicks      Int     @default(0)
+  conversions Int     @default(0)
+  revenue     Decimal @default(0) @db.Decimal(10, 2)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AffiliateCommission {
+  id                  String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId         String
+  orderId             String?
+  type                String   @default("one_time")
+  amount              Decimal  @db.Decimal(10, 2)
+  rate                Decimal  @db.Decimal(5, 4)
+  orderTotal          Decimal  @db.Decimal(10, 2)
+  status              String   @default("pending")
+  goaffproCommissionId String?
+  approvedAt          DateTime?
+  paidAt              DateTime?
+  createdAt           DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AffiliatePayout {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId String
+  amount      Decimal  @db.Decimal(10, 2)
+  method      String   @default("paypal")
+  status      String   @default("pending")
+  reference   String?
+  notes       String?
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AffiliateReferral {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId String
+  orderId     String?
+  customerId  String?
+  type        String   @default("click")
+  ipAddress   String?
+  userAgent   String?
+  referralUrl String?
+  convertedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AffiliateCampaign {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId String
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AffiliateClick {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  affiliateId String
+  funnelId    String?
+  pageId      String?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([affiliateId])
+  @@index([funnelId])
+  @@index([pageId])
+}
+
+// ============================================================
+// EMAIL & AUTOMATION
+// ============================================================
+
+model EmailCampaign {
+  id               String          @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId          String
+  name             String
+  subject          String?
+  type             String          @default("broadcast")
+  status           String          @default("draft")
+  brevoTemplateId  Int?
+  brevoCampaignId  Int?
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  recipientCount   Int             @default(0)
+  openCount        Int             @default(0)
+  clickCount       Int             @default(0)
+  unsubscribeCount Int             @default(0)
+  bounceCount      Int             @default(0)
+  revenue          Decimal         @default(0) @db.Decimal(10, 2)
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model AutomationWorkflow {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId        String?
+  name           String
+  description    String?
+  trigger        String
+  status         String   @default("active")
+  brevoWorkflowId Int?
+  config         Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store   Store?            @relation(fields: [storeId], references: [id])
+  triggers WorkflowTrigger[]
+  events  WorkflowEvent[]
+}
+
+model WorkflowTrigger {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  workflowId String
+  eventType  String
+  conditions Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  workflow AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model WorkflowEvent {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  workflowId String
+  customerId String?
+  eventType  String
+  status     String   @default("pending")
+  payload    Json?
+  processedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  workflow AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CustomerSegment {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId      String?
+  name         String
+  description  String?
+  conditions   Json     @default("[]")
+  memberCount  Int      @default(0)
+  brevoListId  Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store Store? @relation(fields: [storeId], references: [id])
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+
+model AnalyticsEvent {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  sessionId String?
+  customerId String?
+  eventType String
+  page      String?
+  referrer  String?
+  source    String?
+  medium    String?
+  campaign  String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model ConversionEvent {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId    String?
+  orderId    String?
+  customerId String?
+  funnelStep String
+  value      Decimal? @db.Decimal(10, 2)
+  source     String?
+  affiliateId String?
+  createdAt  DateTime @default(now())
+
+  store Store? @relation(fields: [storeId], references: [id])
+}
+
+model FunnelEvent {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId     String?
+  sessionId   String
+  step        String
+  completedAt DateTime?
+  droppedAt   DateTime?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  store Store? @relation(fields: [storeId], references: [id])
+}
+
+model AttributionRecord {
+  id           String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  orderId      String?
+  customerId   String?
+  source       String?
+  medium       String?
+  campaign     String?
+  affiliateId  String?
+  referralCode String?
+  firstTouch   Json?
+  lastTouch    Json?
+  createdAt    DateTime @default(now())
+}
+
+// ============================================================
+// CHECKOUT & FUNNELS
+// ============================================================
+
+model Offer {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId         String
+  productId       String
+  name            String
+  slug            String
+  pricingType     String   @default("one_time")
+  currency        String   @default("USD")
+  stripePriceId   String?
+  enableCoupons   Boolean  @default(true)
+  enableOrderBump Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  prices  Price[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([productId])
+}
+
+model Price {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  offerId       String
+  amount        Decimal  @db.Decimal(10, 2)
+  interval      String   @default("one_time")
+  intervalCount Int      @default(1)
+  stripePriceId String?
+  trialDays     Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([offerId])
+}
+
+model Coupon {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId       String
+  code          String   @unique
+  type          String   @default("percentage")
+  amountOff     Decimal? @db.Decimal(10, 2)
+  percentOff    Decimal? @db.Decimal(5, 2)
+  stripeCouponId String?
+  affiliateId   String?
+  expiresAt     DateTime?
+  maxUses       Int      @default(0)
+  currentUses   Int      @default(0)
+  active        Boolean  @default(true)
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([storeId])
+  @@index([affiliateId])
+}
+
+model Funnel {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  name      String
+  slug      String
+  status    String   @default("draft")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  steps FunnelStep[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model FunnelStep {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  funnelId       String
+  pageId         String
+  type           String
+  routeType      String   @default("page")
+  stepOrder      Int      @default(0)
+  templateId     String?
+  nextStepId     String?
+  declineStepId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  funnel       Funnel       @relation(fields: [funnelId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  template     Template?    @relation(fields: [templateId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  declineStep  FunnelStep?  @relation("FunnelStepDecline", fields: [declineStepId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  acceptSteps  FunnelStep[] @relation("FunnelStepDecline")
+
+  @@index([funnelId])
+  @@index([pageId])
+  @@index([templateId])
+  @@index([declineStepId])
+}
+
+// ============================================================
+// PAGEBUILDER CMS — New Models
+// ============================================================
+
+model Page {
+  id            String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId       String
+  name          String
+  slug          String
+  type          String    @default("page")
+  status        String    @default("draft")
+  visibility    Json      @default("{\"rule\":\"everyone\"}")
+  html          String    @default("")
+  css           String?
+  js            String?
+  metadata      Json?     @default("{}")
+  settings      Json?     @default("{}")
+  publishedHtml String?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  store    Store         @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  versions PageVersion[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([slug])
+}
+
+model PageVersion {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  pageId    String
+  version   Int      @default(1)
+  html      String   @default("")
+  css       String?
+  js        String?
+  metadata  Json?    @default("{}")
+  notes     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([pageId, version])
+  @@index([pageId])
+}
+
+model Template {
+  id            String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId       String
+  name          String
+  slug          String
+  type          String    @default("custom")
+  isCore        Boolean   @default(false)
+  isPublished   Boolean   @default(false)
+  status        String    @default("draft")
+  html          String    @default("")
+  css           String?
+  js            String?
+  metadata      Json?     @default("{}")
+  settings      Json?     @default("{}")
+  publishedHtml String?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  store    Store              @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  versions TemplateVersion[]
+  funnelSteps FunnelStep[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([type])
+}
+
+model TemplateVersion {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  templateId String
+  version    Int      @default(1)
+  html       String   @default("")
+  css        String?
+  js         String?
+  metadata   Json?    @default("{}")
+  notes      String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+}
+
+model GlobalComponent {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  type      String
+  name      String
+  html      String   @default("")
+  css       String?
+  isActive  Boolean  @default(true)
+  settings  Json?    @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([storeId])
+  @@index([type])
+}
+
+model Form {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  name      String
+  type      String   @default("contact")
+  fields    Json     @default("[]")
+  settings  Json?    @default("{}")
+  html      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store       Store              @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  submissions FormSubmission[]
+
+  @@index([storeId])
+}
+
+model FormSubmission {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  formId    String
+  data      Json     @default("{}")
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+
+  form Form @relation(fields: [formId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([formId])
+}
+
+model GlobalData {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String   @unique
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model CustomVariable {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  key       String
+  value     String   @default("")
+  type      String   @default("text")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId])
+}
+
+model FunnelAnalyticsEvent {
+  id        String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId   String
+  funnelId  String?
+  stepId    String?
+  sessionId String?
+  eventType String
+  value     Decimal?  @db.Decimal(10, 2)
+  metadata  Json?     @default("{}")
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([storeId])
+  @@index([funnelId])
+  @@index([stepId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model CheckoutSession {
+  id                String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  storeId           String
+  orderId           String?  @unique
+  idempotencyKey    String   @unique
+  stripeSessionId   String?  @unique
+  stripeSessionUrl  String?
+  mode              String   @default("payment")
+  status            String   @default("pending")
+  metadata          Json?    @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([storeId])
+  @@index([orderId])
+}
+
+// ============================================================
+// WEBHOOKS
+// ============================================================
+
+model WebhookEvent {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId  String?
+  source          String
+  eventType       String
+  eventId         String?
+  payload         Json
+  rawBody         String?
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(5)
+  processedAt     DateTime?
+  nextRetryAt     DateTime?
+  failureReason   String?
+  correlationId   String?
+  tenantId        String?
+  processingMs    Int?
+  deadLettered    Boolean  @default(false)
+  deadLetteredAt  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model WebhookDeadLetter {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  webhookEventId String
+  source         String
+  eventType      String
+  eventId        String?
+  payload        Json
+  failureReason  String?
+  attempts       Int
+  organizationId String?
+  correlationId  String?
+  createdAt      DateTime @default(now())
+  replayedAt     DateTime?
+  replayedBy     String?
+}
+
+// ============================================================
+// BACKGROUND JOBS
+// ============================================================
+
+model BackgroundJob {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String?
+  queue          String
+  jobType        String
+  payload        Json
+  status         String   @default("pending")
+  attempts       Int      @default(0)
+  maxAttempts    Int      @default(3)
+  scheduledAt    DateTime @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failureReason  String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+// ============================================================
+// NOTIFICATIONS & FEATURE FLAGS
+// ============================================================
+
+model Notification {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String
+  userId         String?
+  type           String
+  title          String
+  message        String
+  isRead         Boolean  @default(false)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model FeatureFlag {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String?
+  key            String
+  enabled        Boolean  @default(false)
+  rolloutPercent Int      @default(0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// ============================================================
+// STRIPE RECONCILIATION
+// ============================================================
+
+model StripeReconciliationLog {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId  String?
+  storeId         String?
+  runAt           DateTime @default(now())
+  status          String
+  ordersChecked   Int      @default(0)
+  ordersMismatched Int     @default(0)
+  ordersFixed     Int      @default(0)
+  subsChecked     Int      @default(0)
+  subsMismatched  Int      @default(0)
+  subsFixed       Int      @default(0)
+  errors          Json?
+  durationMs      Int?
+  triggeredBy     String   @default("scheduler")
+  createdAt       DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================================
+// SUPPORT DESK
+// ============================================================
+
+model SupportTicket {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  organizationId String
+  customerName   String?
+  customerEmail  String
+  subject        String
+  status         String   @default("open")
+  createdAt      DateTime @default(now()) @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  messages     SupportMessage[]
+  tags         SupportTag[]
+
+  @@index([organizationId])
+  @@index([customerEmail])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+model SupportMessage {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  ticketId   String
+  senderType String   // customer | agent
+  senderEmail String?
+  body       String
+  createdAt  DateTime @default(now()) @db.Timestamptz()
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
+}
+
+model SupportTag {
+  id       String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  ticketId String
+  tag      String
+  createdAt DateTime @default(now()) @db.Timestamptz()
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, tag])
+  @@index([ticketId])
+}
+
+// ============================================================
+// SNAKE_CASE MODELS (created by final migration)
+// ============================================================
+
+model coupons {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code           String   @unique
+  type           String
+  value          Decimal  @default(0) @db.Decimal(10, 2)
+  usage_count    Int      @default(0)
+  usage_limit    Int?
+  minimum_order  Decimal? @db.Decimal(10, 2)
+  expires_at     DateTime? @db.Timestamptz(6)
+  status         String   @default("active")
+  revenue        Decimal  @default(0) @db.Decimal(12, 2)
+  stripe_coupon_id String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([code], map: "idx_coupons_code")
+  @@index([status], map: "idx_coupons_status")
+}
+
+model integration_settings {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider    String   @unique
+  credentials Json     @default("{}")
+  connected   Boolean  @default(false)
+  details     String?
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([provider], map: "idx_integration_settings_provider")
+}
+
+model store_credentials {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  store_id               String   @unique
+  stripe_secret_key      String?
+  stripe_publishable_key String?
+  stripe_webhook_secret  String?
+  resend_api_key         String?
+  updated_at             DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([store_id], map: "idx_store_credentials_store_id")
+}
+
+model funnel_steps {
+  id                      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  funnel_id               String           @db.Uuid
+  step_order              Int
+  step_type               FunnelStepType   @default(upsell)
+  name                    String
+  price_cents             Int              @default(0)
+  currency                String           @default("usd")
+  html_content            String?
+  decline_next_step_order Int?
+  accept_next_step_order  Int?
+  stripe_price_id         String?
+  created_at              DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?        @default(now()) @updatedAt @db.Timestamptz(6)
+
+  upsell_funnels upsell_funnels? @relation(fields: [funnel_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  upsell_charges upsell_charges[]
+
+  @@index([funnel_id], map: "idx_funnel_steps_funnel_id")
+  @@index([funnel_id, step_order], map: "idx_funnel_steps_order")
+}
+
+model upsell_funnels {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  description       String?
+  is_active         Boolean?        @default(true)
+  trigger_product_id String?
+  created_at        DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?       @default(now()) @updatedAt @db.Timestamptz(6)
+
+  funnel_steps  funnel_steps[]
+  upsell_sessions upsell_sessions[]
+  funnel_products FunnelProduct[]
+}
+
+model upsell_charges {
+  id                       String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  upsell_session_id        String                @db.Uuid
+  funnel_step_id           String                @db.Uuid
+  stripe_payment_intent_id String?
+  stripe_customer_id       String
+  stripe_payment_method_id String
+  amount_cents             Int
+  currency                 String                @default("usd")
+  status                   UpsellChargeStatus?   @default(pending)
+  error_message            String?
+  created_at               DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?             @default(now()) @updatedAt @db.Timestamptz(6)
+
+  funnel_steps    funnel_steps    @relation(fields: [funnel_step_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  upsell_sessions upsell_sessions @relation(fields: [upsell_session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([upsell_session_id], map: "idx_upsell_charges_session")
+}
+
+model upsell_sessions {
+  id                         String               @id @default(dbgenerated("(gen_random_uuid())::text")) @db.Uuid
+  stripe_checkout_session_id String
+  stripe_customer_id         String
+  stripe_payment_method_id   String
+  funnel_id                  String?              @db.Uuid
+  current_step_order         Int?                 @default(1)
+  status                     UpsellSessionStatus? @default(active)
+  accepted_step_orders       Int[]                @default([])
+  declined_step_orders       Int[]                @default([])
+  customer_email             String?
+  original_order_amount      Int?
+  total_upsell_revenue       Int?                 @default(0)
+  created_at                 DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?            @default(now()) @updatedAt @db.Timestamptz(6)
+  expires_at                 DateTime?            @default(dbgenerated("(CURRENT_TIMESTAMP + '02:00:00'::interval)")) @db.Timestamptz(6)
+
+  upsell_charges upsell_charges[]
+  upsell_funnels upsell_funnels? @relation(fields: [funnel_id], references: [id], onUpdate: NoAction)
+
+  @@index([stripe_checkout_session_id], map: "idx_upsell_sessions_checkout")
+  @@index([stripe_customer_id], map: "idx_upsell_sessions_customer")
+}
+
+enum SaleseekerJobStatus {
+  pending
+  running
+  done
+  failed
+
+  @@map("saleseeker_job_status")
+}
+
+model SaleseekerBusiness {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.Uuid
+  name      String
+  website   String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  niche     String
+  placeId   String?  @map("place_id")
+  rating    Float?
+  reviews   Int?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  leads SaleseekerLead[]
+
+  @@unique([placeId], map: "saleseeker_businesses_place_id_key")
+  @@index([niche, city, state, country], map: "idx_saleseeker_businesses_geo_niche")
+  @@map("saleseeker_businesses")
+}
+
+model SaleseekerLead {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  email      String
+  phone      String?
+  ownerName  String?  @map("owner_name")
+  sourceUrl  String?  @map("source_url")
+  tags       String[] @default([])
+  campaignId String?  @map("campaign_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  business  SaleseekerBusiness   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaign  SaleseekerCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, email], map: "saleseeker_leads_business_email_key")
+  @@index([campaignId], map: "idx_saleseeker_leads_campaign")
+  @@map("saleseeker_leads")
+}
+
+model SaleseekerCampaign {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text")) @db.Uuid
+  name      String
+  niche     String?
+  tags      String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  leads SaleseekerLead[]
+
+  @@index([niche], map: "idx_saleseeker_campaigns_niche")
+  @@map("saleseeker_campaigns")
+}
+
+model SaleseekerJob {
+  id        String            @id @default(dbgenerated("(gen_random_uuid())::text")) @db.Uuid
+  status    SaleseekerJobStatus @default(pending)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt], map: "idx_saleseeker_jobs_status_created")
+  @@map("saleseeker_jobs")
+}

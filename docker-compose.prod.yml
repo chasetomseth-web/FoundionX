@@ -1,0 +1,93 @@
+# ============================================================
+# MerchantOS — docker-compose (Production Override)
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+version: '3.9'
+
+services:
+  frontend:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER}/merchantos-frontend:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  worker:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_OWNER}/merchantos-worker:${IMAGE_TAG:-latest}
+    restart: always
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    environment:
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    image: redis:7.2-alpine
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD}
+      --save 900 1
+      --save 300 10
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 1.2G
+
+  pgbouncer:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/merchantos/redis

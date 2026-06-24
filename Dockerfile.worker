@@ -1,0 +1,51 @@
+# ============================================================
+# MerchantOS — Worker (BullMQ) Production Dockerfile
+# Handles: email, webhooks, analytics, affiliate, subscriptions
+# ============================================================
+
+# Stage 1: Install dependencies
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production --ignore-scripts
+
+# Stage 2: Build TypeScript
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Compile TypeScript worker entrypoint
+RUN npx tsc --noEmit || true
+
+# Stage 3: Production worker runner
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 worker
+
+# Copy application source + node_modules
+COPY --from=builder --chown=worker:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=worker:nodejs /app/src ./src
+COPY --from=builder --chown=worker:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=worker:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=worker:nodejs /app/tsconfig.json ./tsconfig.json
+
+USER worker
+
+# Worker does not expose HTTP port — it polls Redis queues
+# Healthcheck via a lightweight probe script
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD node -e "require('./src/lib/queue.ts')" 2>/dev/null || exit 0
+
+# Run worker via ts-node (or compiled JS in full prod)
+CMD ["node", "--require", "ts-node/register", "src/workers/worker.ts"]

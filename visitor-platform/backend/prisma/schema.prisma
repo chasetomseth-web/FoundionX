@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Visitor {
+  id        String    @id @default(uuid())
+  email     String?
+  firstSeen DateTime  @default(now())
+  lastSeen  DateTime  @default(now())
+  totalSessions Int     @default(0)
+  locationCity   String?
+  locationState  String?
+  locationCountry String?
+  locationTimezone String?
+  company   String?
+  sessions  Session[]
+}
+
+model Session {
+  id              String     @id @default(uuid())
+  anonymousId     String     @unique
+  visitorId       String?
+  visitor         Visitor?   @relation(fields: [visitorId], references: [id])
+  startTime       DateTime   @default(now())
+  endTime         DateTime?
+  durationSeconds Int?
+  entryPage       String     @default("/")
+  exitPage        String?
+  pagesViewed     Int        @default(0)
+  conversionStatus String?   @default("anonymous")
+  intentScore     Int?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  referrer        String?
+  events          Event[]
+  identities      Identity[]
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id])
+  type      String
+  url       String
+  timestamp DateTime @default(now())
+  metadata  Json?
+  pagePath  String?
+
+  @@index([timestamp])
+}
+
+model Identity {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id])
+  email     String
+  createdAt DateTime @default(now())
+}

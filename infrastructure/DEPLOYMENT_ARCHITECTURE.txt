@@ -1,0 +1,305 @@
+MERCHANTOS — PRODUCTION DEPLOYMENT ARCHITECTURE
+================================================
+
+Last Updated: 2026-05-23
+Version: 1.0.0
+
+================================================================
+DEPLOYMENT TOPOLOGY
+================================================================
+
+                        ┌─────────────────────────────────┐
+                        │         Load Balancer            │
+                        │   (Nginx / AWS ALB / Fly proxy)  │
+                        └────────────┬────────────────────┘
+                                     │ HTTPS :443
+                        ┌────────────▼────────────────────┐
+                        │     Frontend Containers (x2)     │
+                        │     Next.js 15 — Port 3000       │
+                        │     API Routes + SSR + UI        │
+                        │     Healthcheck: /api/health     │
+                        └────────────┬────────────────────┘
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              │                      │                      │
+   ┌──────────▼──────┐   ┌──────────▼──────┐   ┌──────────▼──────┐
+   │   PgBouncer     │   │   Redis 7.2      │   │  Worker (x2)    │
+   │  Port 5432      │   │  Port 6379       │   │  BullMQ Jobs    │
+   │  Pool: 25/conn  │   │  AOF + RDB       │   │  Concurrency:10 │
+   └──────────┬──────┘   └─────────────────┘   └─────────────────┘
+              │
+   ┌──────────▼──────┐
+   │  PostgreSQL 15  │
+   │  (Managed DB)   │
+   │  Supabase/RDS   │
+   └─────────────────┘
+
+================================================================
+CONTAINER ARCHITECTURE
+================================================================
+
+SERVICE         IMAGE                           REPLICAS  MEMORY
+─────────────────────────────────────────────────────────────────
+frontend        merchantos-frontend:latest      2         1GB
+worker          merchantos-worker:latest        2         512MB
+redis           redis:7.2-alpine                1         1.2GB
+pgbouncer       bitnami/pgbouncer:1.22.1        1         128MB
+
+================================================================
+LAYER SEPARATION
+================================================================
+
+LAYER 1 — Frontend / API (Next.js)
+  • Serves UI (SSR + static)
+  • Handles all API routes (/api/*)
+  • Processes incoming webhooks
+  • Stateless — no local disk writes
+  • Scales horizontally (add replicas)
+
+LAYER 2 — Worker (BullMQ)
+  • Processes background jobs from Redis queues
+  • Handles: email, analytics, affiliate, subscriptions
+  • Stateless — reads/writes only to DB + Redis
+  • Scales independently from frontend
+  • Safe to restart mid-job (jobs re-queued on crash)
+
+LAYER 3 — Redis
+  • Job queue storage (BullMQ)
+  • Read-through cache (tenant data, KPIs)
+  • Session cache
+  • Rate limit counters
+  • AOF persistence enabled (everysec)
+  • RDB snapshots: 900s/1 change, 300s/10, 60s/10000
+
+LAYER 4 — PgBouncer
+  • Transaction-mode connection pooling
+  • max_client_conn: 1000
+  • pool_size: 25 per database
+  • Sits between app and PostgreSQL
+  • Prevents connection exhaustion under load
+
+LAYER 5 — PostgreSQL
+  • Managed (Supabase / AWS RDS / Neon)
+  • Partitioned tables: orders, analytics_events, webhook_events
+  • Materialized views: revenue, GMV, MRR, LTV, conversion
+  • Full-text search: ts_vector indexes
+  • Row-level security ready
+
+================================================================
+WORKER JOB QUEUES
+================================================================
+
+QUEUE           JOBS                              PRIORITY
+─────────────────────────────────────────────────────────────────
+email           order_confirmation                HIGH
+                failed_payment_recovery           HIGH
+                subscription_renewal              MEDIUM
+                affiliate_welcome                 MEDIUM
+                abandoned_cart                    LOW
+
+webhook         stripe_event_processing           HIGH
+                goaffpro_sync                     MEDIUM
+                brevo_event                       LOW
+
+analytics       aggregate_analytics               LOW
+                refresh_materialized_views        LOW
+
+subscription    process_retry                     HIGH
+                renewal_check                     MEDIUM
+
+affiliate       sync_commissions                  MEDIUM
+                process_payout                    LOW
+
+cart_recovery   send_recovery_email               LOW
+
+DLQ (Dead Letter Queue):
+  • Jobs failing after 3 retries → moved to DLQ
+  • DLQ visible at /api/admin/queues
+  • Manual replay via /api/jobs (POST with jobId)
+
+================================================================
+SCALING STRATEGY
+================================================================
+
+HORIZONTAL SCALING TRIGGERS:
+
+Frontend replicas:
+  • Scale up when: CPU > 70% OR p95 latency > 500ms
+  • Scale down when: CPU < 30% for 10 minutes
+  • Min: 2 replicas (HA), Max: 10 replicas
+
+Worker replicas:
+  • Scale up when: queue backlog > 500 jobs
+  • Scale down when: queue backlog < 50 for 5 minutes
+  • Min: 1 replica, Max: 5 replicas
+  • Each worker: WORKER_CONCURRENCY=10 (50 concurrent jobs at max scale)
+
+Redis:
+  • Single instance sufficient up to ~50K req/min
+  • For higher load: Redis Cluster or Redis Sentinel
+  • Managed options: Upstash, Redis Cloud, AWS ElastiCache
+
+PostgreSQL:
+  • Read replicas for dashboard/analytics queries
+  • Write primary for all mutations
+  • PgBouncer handles connection pooling at all scales
+
+================================================================
+RECOMMENDED DEPLOYMENT PLATFORMS
+================================================================
+
+OPTION A — Fly.io (Recommended for simplicity)
+  • Deploy frontend: fly deploy --config fly.frontend.toml
+  • Deploy worker: fly deploy --config fly.worker.toml
+  • Managed Redis: Upstash Redis
+  • Managed DB: Supabase or Neon
+  • Cost: ~$50-200/month for production
+
+OPTION B — AWS (Enterprise scale)
+  • ECS Fargate for frontend + worker containers
+  • ElastiCache for Redis
+  • RDS PostgreSQL with read replicas
+  • ALB for load balancing
+  • ECR for container registry
+  • Cost: ~$200-1000/month depending on scale
+
+OPTION C — Render.com (Simple managed)
+  • Web Service for frontend
+  • Background Worker for worker
+  • Managed Redis
+  • Managed PostgreSQL
+  • Cost: ~$50-150/month
+
+OPTION D — Kubernetes (Maximum control)
+  • Deployments for frontend + worker
+  • StatefulSet for Redis
+  • HPA (HorizontalPodAutoscaler) for auto-scaling
+  • Ingress for routing
+  • Secrets for env vars
+  • Cost: depends on cluster size
+
+================================================================
+DATABASE PRODUCTION SETUP
+================================================================
+
+MIGRATIONS (zero-downtime):
+  1. Run migrations BEFORE deploying new app version
+  2. Migrations must be backward-compatible
+  3. Use: npx prisma migrate deploy (not prisma db push)
+  4. Run from a one-off container, not the main app
+
+MIGRATION ORDER:
+  001_performance_indexes.sql
+  002_partitioning.sql
+  003_materialized_views.sql
+  004_system_tables.sql
+  (then Prisma migrations)
+
+BACKUP STRATEGY:
+  • Automated daily backups (managed DB feature)
+  • Point-in-time recovery (PITR) enabled
+  • Test restore quarterly
+  • Backup retention: 30 days minimum
+
+FAILOVER:
+  • Managed DB handles automatic failover
+  • PgBouncer reconnects automatically
+  • App retries DB connections with exponential backoff
+
+================================================================
+REDIS PRODUCTION CONFIG
+================================================================
+
+PERSISTENCE:
+  appendonly yes
+  appendfsync everysec          # Balance between safety and performance
+  save 900 1                    # Snapshot every 15min if 1 change
+  save 300 10                   # Snapshot every 5min if 10 changes
+  save 60 10000                 # Snapshot every 1min if 10000 changes
+
+MEMORY:
+  maxmemory 1gb
+  maxmemory-policy allkeys-lru  # Evict least recently used keys
+
+SECURITY:
+  requirepass <REDIS_PASSWORD>  # Always set in production
+  bind 127.0.0.1                # Only bind to internal network
+
+================================================================
+OBSERVABILITY INTEGRATION
+================================================================
+
+HEALTH ENDPOINTS:
+  GET /api/health               → Load balancer health check
+  GET /api/admin/env-check      → Environment validation status
+  GET /api/admin/db-health      → Database health + query stats
+  GET /api/admin/observability/overview → Full system overview
+
+METRICS COLLECTION:
+  • All metrics stored in-memory (src/lib/metrics.ts)
+  • Expose via /api/admin/observability/* endpoints
+  • Connect to Datadog/Grafana/New Relic via HTTP scraping
+
+LOG INGESTION:
+  • JSON structured logs to stdout
+  • Docker log driver: json-file (max 50MB, 5 files)
+  • Ship to: Datadog, Logtail, Papertrail, or CloudWatch
+
+ALERTING:
+  • In-app alerts via /api/admin/observability/alerts
+  • Email alerts via Brevo (ALERT_EMAIL env var)
+  • External webhook: ALERT_WEBHOOK_URL env var
+
+================================================================
+SECURITY CHECKLIST (PRE-LAUNCH)
+================================================================
+
+[ ] STRIPE_WEBHOOK_SECRET configured (whsec_...)
+[ ] GOAFFPRO_WEBHOOK_SECRET configured
+[ ] BREVO_WEBHOOK_SECRET configured
+[ ] INTERNAL_API_SECRET set (32+ random chars)
+[ ] CORS_ALLOWED_ORIGINS set to production domain only
+[ ] DATABASE_URL uses sslmode=require
+[ ] REDIS_URL uses password authentication
+[ ] All NEXT_PUBLIC_* keys use live (not test) values
+[ ] Supabase RLS policies reviewed
+[ ] Rate limiting configured (RATE_LIMIT_RPM)
+[ ] HSTS enabled (automatic in production mode)
+[ ] CSP headers configured (automatic in production mode)
+[ ] Admin endpoints protected with INTERNAL_API_SECRET
+[ ] No secrets in codebase or Docker images
+[ ] .env not committed to git (.gitignore verified)
+
+================================================================
+ROLLBACK STRATEGY
+================================================================
+
+AUTOMATED ROLLBACK:
+  • Triggered when health check fails after deployment
+  • Script: scripts/rollback.sh
+  • Reverts to previous Docker image tag
+  • Previous tag stored in /opt/merchantos/.previous-tag
+
+MANUAL ROLLBACK:
+  ./scripts/rollback.sh <previous-image-tag>
+  # or
+  export IMAGE_TAG=<sha>
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+DATABASE ROLLBACK:
+  • Prisma does NOT auto-rollback migrations
+  • Write down-migration SQL before each migration
+  • Store in: prisma/migrations/rollback/XXX_rollback.sql
+  • Run manually: psql $DATABASE_URL -f prisma/migrations/rollback/XXX_rollback.sql
+
+WORKER RECOVERY:
+  • Workers restart automatically (restart: always)
+  • In-flight jobs are re-queued on crash (BullMQ behavior)
+  • DLQ captures jobs that fail repeatedly
+  • Replay DLQ jobs via: POST /api/jobs { action: "replay", jobId: "..." }
+
+QUEUE REPLAY AFTER DEPLOYMENT:
+  • Workers drain gracefully (SIGTERM → wait 30s → exit)
+  • No jobs lost during rolling update
+  • New worker version picks up queue from where old left off
+  • Safe because jobs are idempotent (deduplication keys)

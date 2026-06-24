@@ -1,0 +1,4 @@
+Scrapy==2.11.2
+redis==5.2.1
+requests==2.32.3
+tldextract==5.1.3

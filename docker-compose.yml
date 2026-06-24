@@ -1,0 +1,146 @@
+# ============================================================
+# MerchantOS — docker-compose (Development)
+# Services: frontend, worker, redis, postgres (optional local)
+# ============================================================
+
+version: '3.9'
+
+services:
+  # ── Frontend / API (Next.js) ──────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: runner
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    container_name: merchantos-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      GOAFFPRO_ACCESS_TOKEN: ${GOAFFPRO_ACCESS_TOKEN}
+      GOAFFPRO_WEBHOOK_SECRET: ${GOAFFPRO_WEBHOOK_SECRET}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      BREVO_WEBHOOK_SECRET: ${BREVO_WEBHOOK_SECRET}
+      BREVO_TEMPLATE_ORDER_CONFIRMATION: ${BREVO_TEMPLATE_ORDER_CONFIRMATION}
+      BREVO_TEMPLATE_FAILED_PAYMENT: ${BREVO_TEMPLATE_FAILED_PAYMENT}
+      BREVO_TEMPLATE_SUBSCRIPTION_RENEWAL: ${BREVO_TEMPLATE_SUBSCRIPTION_RENEWAL}
+      BREVO_TEMPLATE_AFFILIATE_WELCOME: ${BREVO_TEMPLATE_AFFILIATE_WELCOME}
+      BREVO_TEMPLATE_ABANDONED_CART: ${BREVO_TEMPLATE_ABANDONED_CART}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - merchantos-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── Background Worker (BullMQ) ────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: runner
+    container_name: merchantos-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      GOAFFPRO_ACCESS_TOKEN: ${GOAFFPRO_ACCESS_TOKEN}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      BREVO_TEMPLATE_ORDER_CONFIRMATION: ${BREVO_TEMPLATE_ORDER_CONFIRMATION}
+      BREVO_TEMPLATE_FAILED_PAYMENT: ${BREVO_TEMPLATE_FAILED_PAYMENT}
+      BREVO_TEMPLATE_SUBSCRIPTION_RENEWAL: ${BREVO_TEMPLATE_SUBSCRIPTION_RENEWAL}
+      BREVO_TEMPLATE_AFFILIATE_WELCOME: ${BREVO_TEMPLATE_AFFILIATE_WELCOME}
+      BREVO_TEMPLATE_ABANDONED_CART: ${BREVO_TEMPLATE_ABANDONED_CART}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - merchantos-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # ── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: merchantos-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - merchantos-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PgBouncer (connection pooler) ─────────────────────────
+  pgbouncer:
+    image: bitnami/pgbouncer:1.22.1
+    container_name: merchantos-pgbouncer
+    restart: unless-stopped
+    environment:
+      POSTGRESQL_HOST: ${POSTGRES_HOST}
+      POSTGRESQL_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRESQL_DATABASE: ${POSTGRES_DB}
+      POSTGRESQL_USERNAME: ${POSTGRES_USER}
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      PGBOUNCER_DEFAULT_POOL_SIZE: 25
+      PGBOUNCER_MIN_POOL_SIZE: 5
+      PGBOUNCER_RESERVE_POOL_SIZE: 5
+      PGBOUNCER_QUERY_TIMEOUT: 30
+      PGBOUNCER_CLIENT_IDLE_TIMEOUT: 60
+    ports:
+      - "5432:5432"
+    networks:
+      - merchantos-net
+    depends_on:
+      - frontend
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  merchantos-net:
+    driver: bridge
