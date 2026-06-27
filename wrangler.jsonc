@@ -1,7 +1,7 @@
 {
   "name": "merchantos",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2024-12-30",
+  "compatibility_date": "2025-06-01",
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
