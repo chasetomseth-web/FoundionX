@@ -18,11 +18,11 @@
   ],
   "routes": [
     {
-      "pattern": "merchantos.app",
+      "pattern": "wiastro.com",
       "custom_domain": true
     },
     {
-      "pattern": "www.merchantos.app",
+      "pattern": "www.wiastro.com",
       "custom_domain": true
     }
   ]
