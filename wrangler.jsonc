@@ -1,5 +1,5 @@
 {
-  "name": "merchantos",
+  "name": "wiastro-foundiox",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-06-01",
   "compatibility_flags": [
@@ -13,7 +13,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "merchantos"
+      "service": "wiastro-foundiox"
     }
   ],
   "routes": [
