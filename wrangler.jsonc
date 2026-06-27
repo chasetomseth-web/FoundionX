@@ -15,5 +15,15 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "merchantos"
     }
+  ],
+  "routes": [
+    {
+      "pattern": "merchantos.app",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.merchantos.app",
+      "custom_domain": true
+    }
   ]
 }
