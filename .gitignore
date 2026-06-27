@@ -15,6 +15,7 @@
 .env
 .env.local
 .env.*.local
+.kilo/
 .open-next/
 .idea/
 .next/
