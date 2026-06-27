@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { Resend } from 'resend';
 import { onboardingDay1Email, onboardingDay7Email } from '@/lib/email/resendEmailTemplates2';
 
+export const runtime = 'nodejs';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function GET(request: NextRequest) {

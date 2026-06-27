@@ -12,10 +12,14 @@ import { getStripeClient } from '@/lib/stripe';
 
 // ── existing webhook handler ──────────────────────────────────────────────────
 
+export const runtime = 'nodejs';
 let stripe: Stripe | null = null;
-async function getStripe() {
+async function getStripe(): Promise<Stripe> {
   if (!stripe) {
     stripe = await getStripeClient();
+  }
+  if (!stripe) {
+    throw new Error('Stripe client failed to initialize');
   }
   return stripe;
 }
@@ -23,6 +27,7 @@ async function getStripe() {
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(req: NextRequest) {
+  stripe = await getStripe();
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
   const correlationId = getCorrelationId(req);
@@ -121,6 +126,7 @@ async function processStripeEvent(eventType: string, data: any) {
 // ── Checkout Completed ────────────────────────────────────────────────────────
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const stripe = await getStripe();
   const metadata = session.metadata ?? {};
   const storeId = metadata.storeId;
   if (!storeId) return;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 
+export const runtime = 'nodejs';
 async function getStripe() {
   try {
     return await getStripeClient();

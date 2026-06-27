@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSubscriptionEmailEvents, getSubscriptionEmailStats } from '@/lib/email/email-tracking';
 
+export const runtime = 'nodejs';
 export async function GET(
   request: NextRequest,
   { params }: { params: { subscriptionId: string } }

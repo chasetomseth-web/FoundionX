@@ -4,6 +4,7 @@ import { processUploadedHtml } from '@/lib/storefront-engine';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 
 // GET /api/storefront — list templates
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

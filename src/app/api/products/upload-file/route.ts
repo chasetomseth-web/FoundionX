@@ -3,6 +3,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadProductFile } from '@/lib/supabase-storage';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

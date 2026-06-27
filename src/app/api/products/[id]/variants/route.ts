@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 
 // GET — list all variants for the product
+export const runtime = 'nodejs';
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
  * GET /api/affiliates/me/payouts — affiliate's payout history
  * POST /api/affiliates/me/payouts — request a payout
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getCustomerFromRequest(req);

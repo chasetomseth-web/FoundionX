@@ -6,6 +6,7 @@ import { getAllSnippets } from '@/lib/embed-snippets';
 /**
  * GET /api/html-store/snippets - Get all embed snippets for the merchant's store
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getAuthFromRequest(req);

@@ -4,6 +4,7 @@ import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/a
 import { appendAuditLog } from '@/lib/audit-log';
 
 // PATCH — adjust inventory
+export const runtime = 'nodejs';
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

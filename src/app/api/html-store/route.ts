@@ -6,6 +6,7 @@ import { deleteHtmlFile } from '@/lib/supabase-storage';
 /**
  * GET /api/html-store - List all HTML pages for the authenticated merchant's store
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getAuthFromRequest(req);

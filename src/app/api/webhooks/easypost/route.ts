@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { mapEasyPostStatus, mapStatusToFulfillment } from '@/lib/easypost';
 import { sendTransactionalEmail } from '@/lib/email';
 
+export const runtime = 'nodejs';
 async function getSenderPreference(): Promise<{ senderEmail: string; senderName: string }> {
   try {
     const { createClient } = await import('@/lib/supabase/server');

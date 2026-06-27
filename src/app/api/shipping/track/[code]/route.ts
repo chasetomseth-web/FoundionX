@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Check if DATABASE_URL is a valid postgres URL
+export const runtime = 'nodejs';
 function hasValidDatabaseUrl(): boolean {
   const url = process.env.DATABASE_URL ?? '';
   return url.startsWith('postgresql://') || url.startsWith('postgres://');

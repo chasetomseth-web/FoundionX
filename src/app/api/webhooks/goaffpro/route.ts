@@ -5,6 +5,7 @@ import { invalidateOnGoAffProEvent } from '@/lib/redis-lock';
 import { getCorrelationId } from '@/lib/observability';
 import crypto from 'crypto';
 
+export const runtime = 'nodejs';
 const GOAFFPRO_WEBHOOK_SECRET = process.env.GOAFFPRO_WEBHOOK_SECRET ?? '';
 
 export async function POST(req: NextRequest) {

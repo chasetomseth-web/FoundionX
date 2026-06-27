@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 import { getStripeSecretKey } from '@/lib/stripe';
 
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

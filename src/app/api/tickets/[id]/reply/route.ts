@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 import { sendEmail, EmailType } from '@/lib/email/emailService';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

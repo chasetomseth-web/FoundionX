@@ -1,5 +1,6 @@
 # ============================================================
 # MerchantOS — Frontend (Next.js) Production Dockerfile
+# DEPRECATED: Will be removed after Cloudflare Pages migration
 # Multi-stage build: deps → builder → runner
 # ============================================================
 

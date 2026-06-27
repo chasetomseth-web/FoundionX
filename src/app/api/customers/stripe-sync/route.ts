@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeSecretKey } from '@/lib/stripe';
 import Stripe from 'stripe';
 
+export const runtime = 'nodejs';
 const STRIPE_API = 'https://api.stripe.com/v1';
 
 async function stripeRequest<T>(path: string, stripeKey: string, options?: RequestInit): Promise<T> {

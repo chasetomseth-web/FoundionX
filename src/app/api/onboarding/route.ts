@@ -13,6 +13,7 @@ import {
 import { ensureCorePages } from '@/lib/storefront-seed';
 
 // GET /api/onboarding — get current onboarding progress
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

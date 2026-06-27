@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 import { suggestReply } from '@/lib/ai/suggestReply';
 
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

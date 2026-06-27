@@ -6,6 +6,7 @@ import { encryptCredential, decryptCredential, maskCredential } from '@/lib/stri
 /**
  * GET /api/store/credentials — Fetch store credentials (masked for security)
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const auth = await getAuthFromRequest(req);
   if (!auth) {

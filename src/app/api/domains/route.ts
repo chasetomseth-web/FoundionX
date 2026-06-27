@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest, unauthorizedResponse } from "@/lib/auth";
 import { addDomainToVercel } from "@/lib/vercel";
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();

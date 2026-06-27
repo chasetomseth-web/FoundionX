@@ -6,10 +6,14 @@ import { createClient } from '@/lib/supabase/server';
 import { resolveStoreId } from '@/lib/merchant-pages/blockHelpers';
 import { getStripeClient } from '@/lib/stripe';
 
+export const runtime = 'nodejs';
 let stripe: Stripe | null = null;
-async function getStripe() {
+async function getStripe(): Promise<Stripe> {
   if (!stripe) {
     stripe = await getStripeClient();
+  }
+  if (!stripe) {
+    throw new Error('Stripe client failed to initialize');
   }
   return stripe;
 }
@@ -42,6 +46,7 @@ function buildIdempotencyKey(
 }
 
 async function resolveCouponId(storeId: string, couponCode: string): Promise<string> {
+  const stripe = await getStripe();
   const normalizedCode = couponCode.trim().toUpperCase();
 
   const localCoupon = await prisma.coupon.findFirst({
@@ -291,6 +296,7 @@ async function resolveLineItems(items: any[], mode: string, storeId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  stripe = await getStripe();
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const storeId = await resolveStoreId(body.storeId?.toString());
   const mode = String(body.mode ?? 'payment');

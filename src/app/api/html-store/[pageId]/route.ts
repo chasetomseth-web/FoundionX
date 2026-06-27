@@ -5,6 +5,7 @@ import { getAuthFromRequest } from '@/lib/auth';
 /**
  * GET /api/html-store/[pageId] - Get single page details
  */
+export const runtime = 'nodejs';
 export async function GET(
   req: NextRequest,
   { params }: { params: { pageId: string } }

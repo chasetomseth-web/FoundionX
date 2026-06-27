@@ -5,6 +5,7 @@ import { sendEmail, EmailType } from '@/lib/email/emailRouter';
 import { systemLog } from '@/lib/logger';
 
 // POST /api/webhooks/shippo — Shippo tracking event webhook
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

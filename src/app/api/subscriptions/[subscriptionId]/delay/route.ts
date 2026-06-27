@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 import { Resend } from 'resend';
 
+export const runtime = 'nodejs';
 async function getStripe() {
   try {
     return await getStripeClient();

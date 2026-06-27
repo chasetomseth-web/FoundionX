@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 import { getStripeSecretKey } from '@/lib/stripe';
 
+export const runtime = 'nodejs';
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

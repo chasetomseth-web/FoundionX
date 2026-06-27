@@ -8,6 +8,7 @@ import { systemLog } from '@/lib/logger';
  * GET /api/auth/customer/affiliate
  * Fetch affiliate data for the logged-in customer.
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getCustomerFromRequest(req);

@@ -1,5 +1,6 @@
 # ============================================================
 # MerchantOS — Worker (BullMQ) Production Dockerfile
+# DEPRECATED: Will be removed after Cloudflare Pages migration
 # Handles: email, webhooks, analytics, affiliate, subscriptions
 # ============================================================
 

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripeClient } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
+export const runtime = 'nodejs';
 async function getStripe() {
   try {
     return await getStripeClient();

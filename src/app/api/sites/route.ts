@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest, unauthorizedResponse } from "@/lib/auth";
 
+export const runtime = 'nodejs';
 const RESERVED_SLUGS = new Set([
   "api",
   "dashboard",

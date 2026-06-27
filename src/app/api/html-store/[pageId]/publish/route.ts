@@ -5,6 +5,7 @@ import { getAuthFromRequest } from '@/lib/auth';
 /**
  * POST /api/html-store/[pageId]/publish - Publish an HTML page
  */
+export const runtime = 'nodejs';
 export async function POST(
   req: NextRequest,
   { params }: { params: { pageId: string } }

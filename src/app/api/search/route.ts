@@ -6,6 +6,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
  * GET /api/search
  * Full-text search across orders, customers, products, subscriptions, affiliates
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

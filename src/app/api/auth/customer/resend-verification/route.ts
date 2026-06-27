@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail, EmailType } from '@/lib/email/emailRouter';
 import crypto from 'crypto';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();

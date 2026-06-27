@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest } from '@/lib/auth';
 import { uploadHtmlFile, uploadAssetFile } from '@/lib/supabase-storage';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const auth = await getAuthFromRequest(req);

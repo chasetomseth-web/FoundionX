@@ -4,6 +4,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
 import { getStripeClient } from '@/lib/stripe';
 import { appendAuditLog } from '@/lib/audit-log';
 
+export const runtime = 'nodejs';
 async function getStripe() {
   try {
     return await getStripeClient();

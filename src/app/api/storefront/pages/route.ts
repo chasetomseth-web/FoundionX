@@ -4,6 +4,7 @@ import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/a
 import { ensureCorePages } from '@/lib/storefront-seed';
 
 // GET /api/storefront/pages — list all pages for the store
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

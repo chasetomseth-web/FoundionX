@@ -5,6 +5,7 @@ import { getGoAffProAccessToken } from '@/lib/integration-settings';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 
 // Helper: map GoAffPro affiliate to MerchantOS shape
+export const runtime = 'nodejs';
 function mapGoAffProAffiliate(a: GoAffProAffiliate) {
   return {
     id: String(a.id),

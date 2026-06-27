@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 // GET /api/funnels/resolve?slug=xxx&after_payment=true
 // Returns the first upsell step URL after payment for funnel-based checkouts
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const slug = searchParams.get('slug');

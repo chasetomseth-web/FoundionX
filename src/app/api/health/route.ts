@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 
+export const runtime = 'nodejs';
 export async function GET() {
   const timestamp = new Date().toISOString();
   const environment = process.env.NODE_ENV ?? 'development';

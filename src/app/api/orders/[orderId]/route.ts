@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 
 // GET /api/orders/[orderId]
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

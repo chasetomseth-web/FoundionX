@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/auth';
 
 // PATCH /api/storefront/pages/[id] — update HTML content, name, status, publish
+export const runtime = 'nodejs';
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

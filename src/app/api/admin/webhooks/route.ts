@@ -13,6 +13,7 @@ import { getWebhookStats, replayWebhookEvent } from '@/lib/webhook-engine';
 import { apiLogger, getCorrelationId } from '@/lib/observability';
 
 // ── GET /api/admin/webhooks ──────────────────────────────────
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const correlationId = getCorrelationId(req);
   const { searchParams } = new URL(req.url);

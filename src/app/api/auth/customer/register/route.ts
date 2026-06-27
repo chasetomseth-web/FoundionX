@@ -4,6 +4,7 @@ import { sendEmail, EmailType } from '@/lib/email/emailRouter';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const { email, password, name, storeId } = await req.json();

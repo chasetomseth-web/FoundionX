@@ -4,6 +4,7 @@ import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/a
 import { getCampaigns } from '@/lib/brevo';
 
 // GET /api/email/campaigns
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

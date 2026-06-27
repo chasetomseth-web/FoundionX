@@ -6,6 +6,7 @@ import { getAuthFromRequest } from '@/lib/auth';
  * GET /api/store/settings — Fetch store settings (ship-from address, pixels, etc.)
  * PATCH /api/store/settings — Update store settings
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const auth = await getAuthFromRequest(req);
   if (!auth) {

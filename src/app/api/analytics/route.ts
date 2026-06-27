@@ -8,6 +8,7 @@ import { getAuthFromRequest, unauthorizedResponse, hasPermission } from '@/lib/a
  */
 
 // Simple in-memory cache (replace with Redis in production)
+export const runtime = 'nodejs';
 const cache = new Map<string, { data: unknown; expiresAt: number }>();
 
 function getCached<T>(key: string): T | null {

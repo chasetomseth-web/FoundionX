@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword, verifyPassword, createSession, deleteSession } from '@/lib/auth';
 
 // POST /api/auth/register
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const { pathname } = req.nextUrl;
 

@@ -4,6 +4,7 @@ import { publishStorefront, invalidateStorefrontCache, getStorefrontStatus } fro
 import { prisma } from '@/lib/prisma';
 
 // GET /api/storefront/publish — get publish status
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

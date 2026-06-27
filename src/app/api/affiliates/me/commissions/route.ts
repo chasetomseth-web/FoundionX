@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 /**
  * GET /api/affiliates/me/commissions — affiliate's own commissions list
  */
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getCustomerFromRequest(req);

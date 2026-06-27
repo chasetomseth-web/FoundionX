@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthFromRequest, unauthorizedResponse } from "@/lib/auth";
 import { removeDomainFromVercel } from "@/lib/vercel";
 
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

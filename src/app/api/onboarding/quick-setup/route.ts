@@ -3,6 +3,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
 import { ensureCorePages } from '@/lib/storefront-seed';
 import { completeOnboardingStep, type OnboardingStep } from '@/lib/onboarding';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

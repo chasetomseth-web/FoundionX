@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { resolveStoreId } from '@/lib/merchant-pages';
 import { buildPublishedPageHtml } from '@/lib/merchant-pages/publish';
 
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({})) as any;

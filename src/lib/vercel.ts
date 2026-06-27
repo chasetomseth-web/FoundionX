@@ -18,7 +18,7 @@ if (checkVercelEnv().length > 0) {
 
 function vercelHeaders() {
   if (!VERCEL_TOKEN) {
-    throw new Error("VERCEL_API_TOKEN is not configured");
+    return null;
   }
   return {
     Authorization: `Bearer ${VERCEL_TOKEN}`,
@@ -31,12 +31,13 @@ function teamQuery() {
 }
 
 export async function addDomainToVercel(hostname: string) {
-  if (!VERCEL_PROJECT_ID) {
-    throw new Error("VERCEL_PROJECT_ID is not configured");
+  if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
+    console.warn('[vercel.ts] Skipped addDomainToVercel: Vercel not configured');
+    return { skipped: true };
   }
   const res = await fetch(
     `${VERCEL_API_BASE}/v10/projects/${VERCEL_PROJECT_ID}/domains${teamQuery()}`,
-    { method: "POST", headers: vercelHeaders(), body: JSON.stringify({ name: hostname }) }
+    { method: "POST", headers: vercelHeaders() || {}, body: JSON.stringify({ name: hostname }) }
   );
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error?.message || "Failed to add domain to Vercel");
@@ -44,12 +45,13 @@ export async function addDomainToVercel(hostname: string) {
 }
 
 export async function getDomainStatus(hostname: string) {
-  if (!VERCEL_PROJECT_ID) {
-    throw new Error("VERCEL_PROJECT_ID is not configured");
+  if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
+    console.warn('[vercel.ts] Skipped getDomainStatus: Vercel not configured');
+    return { skipped: true };
   }
   const res = await fetch(
     `${VERCEL_API_BASE}/v9/projects/${VERCEL_PROJECT_ID}/domains/${hostname}${teamQuery()}`,
-    { headers: vercelHeaders() }
+    { headers: vercelHeaders() || {} }
   );
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error?.message || "Failed to fetch domain status");
@@ -57,12 +59,13 @@ export async function getDomainStatus(hostname: string) {
 }
 
 export async function removeDomainFromVercel(hostname: string) {
-  if (!VERCEL_PROJECT_ID) {
-    throw new Error("VERCEL_PROJECT_ID is not configured");
+  if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
+    console.warn('[vercel.ts] Skipped removeDomainFromVercel: Vercel not configured');
+    return true;
   }
   const res = await fetch(
     `${VERCEL_API_BASE}/v9/projects/${VERCEL_PROJECT_ID}/domains/${hostname}${teamQuery()}`,
-    { method: "DELETE", headers: vercelHeaders() }
+    { method: "DELETE", headers: vercelHeaders() || {} }
   );
   if (!res.ok) {
     const data = await res.json();
@@ -72,12 +75,13 @@ export async function removeDomainFromVercel(hostname: string) {
 }
 
 export async function getDomainConfig(hostname: string) {
-  if (!VERCEL_PROJECT_ID) {
-    throw new Error("VERCEL_PROJECT_ID is not configured");
+  if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) {
+    console.warn('[vercel.ts] Skipped getDomainConfig: Vercel not configured');
+    return { skipped: true };
   }
   const res = await fetch(
     `${VERCEL_API_BASE}/v6/domains/${hostname}/config${teamQuery()}`,
-    { headers: vercelHeaders() }
+    { headers: vercelHeaders() || {} }
   );
   return res.json();
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCustomerFromRequest } from '@/lib/customer-auth';
 import { prisma } from '@/lib/prisma';
 
+export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const auth = await getCustomerFromRequest(req);

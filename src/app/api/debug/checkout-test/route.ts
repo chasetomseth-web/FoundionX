@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
  * 
  * Example: GET /api/debug/checkout-test?storeId=store_123&testMode=full
  */
+export const runtime = 'nodejs';
 export async function GET(request: NextRequest) {
   const storeId = request.nextUrl.searchParams.get('storeId');
   const testMode = request.nextUrl.searchParams.get('testMode') || 'full';

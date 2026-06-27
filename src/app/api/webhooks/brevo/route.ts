@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { parseInboundEmail } from '@/lib/email/inbound-parser';
 import { tagTicket } from '@/lib/ai/tagTicket';
 
+export const runtime = 'nodejs';
 const BREVO_WEBHOOK_SECRET = process.env.BREVO_WEBHOOK_SECRET ?? '';
 
 export async function POST(req: NextRequest) {

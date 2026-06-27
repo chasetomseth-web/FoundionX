@@ -7,6 +7,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
  * Publishes a product and activates its associated funnel.
  * Optionally triggers fulfillment provisioning as a background job.
  */
+export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const session = await getAuthFromRequest(req);
   if (!session) return unauthorizedResponse();

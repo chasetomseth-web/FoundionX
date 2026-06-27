@@ -4,6 +4,7 @@ import { getAuthFromRequest, unauthorizedResponse } from '@/lib/auth';
 import { createShipment, buyShipment, getCheapestRate } from '@/lib/shippo';
 import { sendTransactionalEmail } from '@/lib/email';
 
+export const runtime = 'nodejs';
 async function getSenderPreference(): Promise<{ senderEmail: string; senderName: string }> {
   try {
     const { createClient } = await import('@/lib/supabase/server');

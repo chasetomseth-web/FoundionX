@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { systemLog } from '@/lib/logger';
 import { appendAuditLog } from '@/lib/audit-log';
 
+export const runtime = 'nodejs';
 const COOKIE_NAME = 'mos_affiliate';
 const DEFAULT_COOKIE_DAYS = 30;
 
