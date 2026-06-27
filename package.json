@@ -6,7 +6,7 @@
     "dev": "next dev -p 4028",
     "seed-demo": "node scripts/seed-demo-runner.cjs",
     "seed-demo:prod": "node scripts/seed-demo-runner.cjs",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build && SKIP_WRANGLER_CONFIG_CHECK=yes opennextjs-cloudflare build",
     "start": "next dev -p 4028",
     "lint": "next lint",
     "lint:fix": "next lint --fix",

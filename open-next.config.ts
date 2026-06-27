@@ -1,4 +1,5 @@
 export default {
+  buildCommand: "prisma generate && next build",
   default: {
     override: {
       // OpenNext Cloudflare build requires a deterministic wrapper/converter mapping
