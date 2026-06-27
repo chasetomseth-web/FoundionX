@@ -1,41 +1,33 @@
-# Node modules
-node_modules/
-package-lock.json
-
-# Next.js build output
-.next/
-out/
-
-# Production build
-build/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# OS-specific files
-.DS_Store
-Thumbs.db
-
-# Vercel deployment
-.vercel/
-
-# Optional: if using TypeScript
-*.tsbuildinfo
-
-# Optional: if using testing tools
-coverage/
-jest-test-results.json
-
-# Optional: if using IDEs
-.vscode/
-.idea/
 
 # Local environment files
-.env.local
-
+# Logs
+# Next.js build output
+# Node modules
+# OS-specific files
+# Optional: if using IDEs
 # Optional: if using TurboRepo or monorepo
-turbo/
+# Optional: if using TypeScript
+# Optional: if using testing tools
+# Production build
+# Vercel deployment
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+.idea/
+.next/
 .vercel
+.vercel/
+.vscode/
+Thumbs.db
+build/
+coverage/
+jest-test-results.json
+node_modules/
+npm-debug.log*
+out/
+package-lock.json
+pnpm-debug.log*
+turbo/
+yarn-debug.log*
+yarn-error.log*
