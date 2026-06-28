@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Protected route patterns for merchant auth
-const MERCHANT_PROTECTED_ROUTES: string[] = [];
-
-// Protected route patterns for customer portal
-const CUSTOMER_PROTECTED_ROUTES = ['/portal/dashboard', '/portal/orders', '/portal/subscriptions', '/portal/billing', '/portal/account', '/portal/affiliate'];
-
+// Public routes that don't require authentication
 const PUBLIC_ROUTES = [
+  '/',
   '/sign-up-login-screen',
   '/auth/callback',
   '/api/auth',
@@ -15,7 +11,11 @@ const PUBLIC_ROUTES = [
   '/api/health',
   '/portal/login',
   '/portal/create-account',
+  '/render',
 ];
+
+// Protected route patterns for customer portal
+const CUSTOMER_PROTECTED_ROUTES = ['/portal/dashboard', '/portal/orders', '/portal/subscriptions', '/portal/billing', '/portal/account', '/portal/affiliate'];
 
 const AFFILIATE_COOKIE_NAME = 'mos_affiliate';
 const AFFILIATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
@@ -46,9 +46,11 @@ export async function middleware(req: NextRequest) {
   const isDashboardDomain =
     hostname === "localhost" ||
     hostname.includes("vercel.app") ||
-    hostname === "merchant-os-seven.vercel.app";
+    hostname === "merchant-os-seven.vercel.app" ||
+    hostname === "wiastro.com" ||
+    hostname === "www.wiastro.com";
 
-  if (!isDashboardDomain && !pathname.startsWith("/render/")) {
+  if (!isDashboardDomain && !pathname.startsWith("/render/") && !pathname.startsWith("/api/")) {
     const url = req.nextUrl.clone();
     url.pathname = `/render/${encodeURIComponent(hostname)}/`;
     return NextResponse.rewrite(url);
@@ -75,9 +77,10 @@ export async function middleware(req: NextRequest) {
     return response;
   }
 
-  // ── Merchant Auth Protection ────────────────────────────────────────────
-  const isProtected = MERCHANT_PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
-  if (!isProtected) {
+  // ── Protect All App Routes (require authentication) ─────────────────────
+  // Skip redirect for Next.js RSC prefetch requests to avoid "Failed to fetch RSC payload" errors
+  const isRscRequest = req.headers.get('RSC') === '1' || req.headers.get('Next-Router-Prefetch') === '1';
+  if (isRscRequest) {
     return response;
   }
 
@@ -95,11 +98,6 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    // Skip redirect for Next.js RSC prefetch requests to avoid "Failed to fetch RSC payload" errors
-    const isRscRequest = req.headers.get('RSC') === '1' || req.headers.get('Next-Router-Prefetch') === '1';
-    if (isRscRequest) {
-      return response;
-    }
     const loginUrl = new URL('/sign-up-login-screen', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
@@ -110,6 +108,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|_next/data|favicon.ico|public|api/).*)',
+    '/((?!_next/static|_next/image|_next/data|favicon.ico|public).*)',
   ],
 };
