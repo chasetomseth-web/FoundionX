@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
-  '/',
   '/sign-up-login-screen',
   '/auth/callback',
   '/api/auth',
@@ -57,7 +56,8 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── Public Routes ────────────────────────────────────────────────────────
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) || pathname === '/';
+  if (isPublicRoute) {
     return response;
   }
 

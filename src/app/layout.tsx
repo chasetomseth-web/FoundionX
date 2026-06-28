@@ -6,13 +6,8 @@ import { Toaster } from 'sonner';
 import QueryProvider from '@/providers/QueryProvider';
 import CartProviderWrapper from '@/providers/CartProviderWrapper';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { validateEnv } from '@/lib/env-validation';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 
-// Validate environment variables on app startup
-if (typeof window === 'undefined') {
-  validateEnv();
-}
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
