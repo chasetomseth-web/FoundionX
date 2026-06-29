@@ -18,7 +18,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   # ──────────────────────────────────────────────────────────
