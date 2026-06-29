@@ -17,13 +17,7 @@
     }
   ],
   "routes": [
-    {
-      "pattern": "wiastro.com",
-      "custom_domain": true
-    },
-    {
-      "pattern": "www.wiastro.com",
-      "custom_domain": true
-    }
+    { "pattern": "wiastro.com/*", "zone_name": "wiastro.com" },
+    { "pattern": "www.wiastro.com/*", "zone_name": "wiastro.com" }
   ]
 }

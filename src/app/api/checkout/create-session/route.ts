@@ -5,8 +5,16 @@ import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase/server';
 import { resolveStoreId } from '@/lib/merchant-pages/blockHelpers';
 import { getStripeClient } from '@/lib/stripe';
+import { isValidRequest } from '@/lib/guard';
 
 export const runtime = 'nodejs';
+
+function guard(req: NextRequest) {
+  if (!isValidRequest(req)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return null;
+}
 let stripe: Stripe | null = null;
 async function getStripe(): Promise<Stripe> {
   if (!stripe) {
@@ -296,6 +304,9 @@ async function resolveLineItems(items: any[], mode: string, storeId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = guard(request);
+  if (blocked) return blocked;
+
   stripe = await getStripe();
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const storeId = await resolveStoreId(body.storeId?.toString());

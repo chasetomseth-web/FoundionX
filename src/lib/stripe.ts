@@ -5,6 +5,19 @@ import crypto from 'crypto';
 const ENCRYPTION_KEY = process.env.CREDENTIALS_ENCRYPTION_KEY || 'default-key-change-in-production-min-32-chars!!';
 const ALGORITHM = 'aes-256-cbc';
 
+let serverStripe: Stripe | null = null;
+
+export function getServerStripe(): Stripe {
+  if (!serverStripe) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    serverStripe = new Stripe(secretKey, { apiVersion: '2025-02-24.acacia' });
+  }
+  return serverStripe;
+}
+
 export function encryptCredential(text: string): string {
   if (!text) return '';
   const key = Buffer.from(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));

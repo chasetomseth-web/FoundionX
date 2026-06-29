@@ -77,6 +77,22 @@ export async function middleware(req: NextRequest) {
     return response;
   }
 
+  // ── Owner Site Protection ──────────────────────────────────────────
+  const isOwnerRoute = pathname.startsWith('/owner');
+  if (isOwnerRoute) {
+    if (pathname.startsWith('/owner/login')) {
+      return response;
+    }
+    const ownerKey = req.cookies.get('owner_access')?.value;
+    if (ownerKey !== process.env.OWNER_SECRET) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/owner/login', req.url));
+    }
+    return response;
+  }
+
   // ── Protect All App Routes (require authentication) ─────────────────────
   // Skip redirect for Next.js RSC prefetch requests to avoid "Failed to fetch RSC payload" errors
   const isRscRequest = req.headers.get('RSC') === '1' || req.headers.get('Next-Router-Prefetch') === '1';

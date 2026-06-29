@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getStripeClient } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
+import { isValidRequest } from '@/lib/guard';
 
 async function getStripe(): Promise<Stripe | null> {
   try {
@@ -11,12 +12,22 @@ async function getStripe(): Promise<Stripe | null> {
   }
 }
 
+function guard(req: NextRequest) {
+  if (!isValidRequest(req)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return null;
+}
+
 /**
  * POST /api/coupons/apply
  * Validates a coupon code and returns the discount details.
  * Also resolves the Stripe coupon ID so checkout can apply it directly.
  */
 export async function POST(req: NextRequest) {
+  const blocked = guard(req);
+  if (blocked) return blocked;
+
   try {
     const { code, orderTotal } = await req.json();
 
