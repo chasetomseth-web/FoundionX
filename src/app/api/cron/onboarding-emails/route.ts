@@ -4,7 +4,14 @@ import { Resend } from 'resend';
 import { onboardingDay1Email, onboardingDay7Email } from '@/lib/email/resendEmailTemplates2';
 
 export const runtime = 'nodejs';
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (key && key.length > 10 && !key.startsWith('your-') && !key.includes('placeholder')) {
+    return new Resend(key);
+  }
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,19 +88,22 @@ export async function GET(request: NextRequest) {
 
         const productName = order.items[0]?.product?.name || 'your purchase';
 
-        const emailTemplate = onboardingDay1Email({
-          customerName: order.customer.name || order.customer.email,
-          productName,
-          usageTips,
-          habitMessage,
-        });
+const emailTemplate = onboardingDay1Email({
+           customerName: order.customer.name || order.customer.email,
+           productName,
+           usageTips,
+           habitMessage,
+         });
 
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
-          to: order.customer.email,
-          subject: emailTemplate.subject,
-          html: emailTemplate.html,
-        });
+         const resend = getResendClient();
+         if (resend) {
+           await resend.emails.send({
+             from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
+             to: order.customer.email,
+             subject: emailTemplate.subject,
+             html: emailTemplate.html,
+           });
+         }
 
         // Update metadata
         await prisma.order.update({
@@ -180,19 +190,22 @@ export async function GET(request: NextRequest) {
             })
           : undefined;
 
-        const emailTemplate = onboardingDay7Email({
-          customerName: order.customer.name || order.customer.email,
-          productName,
-          testimonials,
-          nextBillingDate,
-        });
+const emailTemplate = onboardingDay7Email({
+           customerName: order.customer.name || order.customer.email,
+           productName,
+           testimonials,
+           nextBillingDate,
+         });
 
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
-          to: order.customer.email,
-          subject: emailTemplate.subject,
-          html: emailTemplate.html,
-        });
+         const resend = getResendClient();
+         if (resend) {
+           await resend.emails.send({
+             from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
+             to: order.customer.email,
+             subject: emailTemplate.subject,
+             html: emailTemplate.html,
+           });
+         }
 
         // Update metadata
         await prisma.order.update({

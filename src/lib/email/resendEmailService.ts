@@ -5,7 +5,18 @@
 
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient: Resend | null = null;
+function getResendClient(): Resend | null {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey && apiKey.length > 10 && !apiKey.startsWith('your-')) {
+      resendClient = new Resend(apiKey);
+    }
+  }
+  return resendClient;
+}
+
+const resend = getResendClient();
 const FROM_EMAIL = process.env.EMAIL_FROM || 'noreply@merchantos.com';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -372,8 +383,13 @@ export async function sendAuthEmail(input: { to: Array<{ email: string; name?: s
 }
 
 export async function sendEmail(to: string, template: EmailTemplate): Promise<void> {
+  const client = getResendClient();
+  if (!client) {
+    console.warn('Resend not configured - email not sent');
+    return;
+  }
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: template.subject,
@@ -381,6 +397,5 @@ export async function sendEmail(to: string, template: EmailTemplate): Promise<vo
     });
   } catch (error) {
     console.error('Email send error:', error);
-    // Silent failure - log but don't throw
   }
 }

@@ -4,7 +4,14 @@ import { Resend } from 'resend';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (key && key.length > 10 && !key.startsWith('your-') && !key.includes('placeholder')) {
+    return new Resend(key);
+  }
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,6 +97,11 @@ export async function GET(request: NextRequest) {
           day: 'numeric',
           year: 'numeric',
         });
+
+        const resend = getResendClient();
+         if (!resend) {
+           throw new Error('Resend not configured');
+         }
 
         await resend.emails.send({
           from: process.env.EMAIL_FROM || 'noreply@merchantos.com',

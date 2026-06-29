@@ -65,9 +65,21 @@ const deleteCookie = (name: string) => {
 };
 
 export function createClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key || url.includes('your-') || key.includes('placeholder') || key.includes('your-')) {
+    // Return a mock client that will fail gracefully at runtime
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: new Error('Supabase not configured') }),
+      },
+    } as any;
+  }
+  
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),

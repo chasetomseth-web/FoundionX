@@ -7,9 +7,13 @@ import { prisma } from './prisma';
 import { reconcileLogger } from './observability';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia',
-});
+function getStripeClient(): Stripe | null {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) return null;
+  return new Stripe(secretKey, {
+    apiVersion: '2025-02-24.acacia',
+  });
+}
 
 // ============================================================
 // MAIN RECONCILIATION JOB
@@ -168,8 +172,14 @@ async function reconcileOrders(
     if (!order.stripePaymentIntentId) continue;
     checked++;
 
+    const stripeClient = getStripeClient();
+    if (!stripeClient) {
+      errors.push('Stripe not configured');
+      continue;
+    }
+
     try {
-      const pi = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+      const pi = await stripeClient.paymentIntents.retrieve(order.stripePaymentIntentId);
 
       const expectedStatus = mapStripeStatusToPaymentStatus(pi.status);
       if (order.paymentStatus !== expectedStatus) {
@@ -235,8 +245,14 @@ async function reconcileSubscriptions(
     if (!sub.stripeSubscriptionId) continue;
     checked++;
 
+    const stripeClient = getStripeClient();
+    if (!stripeClient) {
+      errors.push('Stripe not configured');
+      continue;
+    }
+
     try {
-      const stripeSub = await stripe.subscriptions.retrieve(sub.stripeSubscriptionId);
+      const stripeSub = await stripeClient.subscriptions.retrieve(sub.stripeSubscriptionId);
 
       const expectedStatus = mapStripeSubStatus(stripeSub.status);
       if (sub.status !== expectedStatus) {

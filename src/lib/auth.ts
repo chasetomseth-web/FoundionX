@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from './prisma';
 import crypto from 'crypto';
-import { createClient } from '@/lib/supabase/server';
 
 // ============================================================
 // TYPES
@@ -222,103 +221,6 @@ export async function getAuthFromRequest(req: NextRequest): Promise<AuthSession 
     email: "owner@app.com",
     name: "Owner",
   };
-  // Try cookie session first
-  const sessionToken = req.cookies.get('merchantos_session')?.value;
-  if (sessionToken) {
-    return validateSession(sessionToken);
-  }
-
-  // Try Bearer token
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    return validateSession(token);
-  }
-
-  // Fall back to Supabase session — use request cookies directly
-  try {
-    const { createServerClient } = await import('@supabase/ssr');
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return req.cookies.getAll();
-          },
-          setAll() {
-            // no-op in API routes (read-only)
-          },
-        },
-      }
-    );
-    const allCookies = req.cookies.getAll();
-    console.log('[AUTH DEBUG] Cookies:', allCookies.map(c => c.name));
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-    console.log('[AUTH DEBUG] supabaseUser:', supabaseUser?.email, 'error:', authError?.message);
-
-    if (supabaseUser?.email) {
-      const email = supabaseUser.email;
-      const name = supabaseUser.user_metadata?.full_name as string | undefined
-        || supabaseUser.email?.split('@')[0];
-
-      // Look up existing UserOrganization by email
-      let userOrg = await prisma.userOrganization.findFirst({
-        where: { user: { email } },
-        include: {
-          user: true,
-          organization: true,
-        },
-      });
-
-      if (!userOrg) {
-        // Auto-create user + org + membership in transaction
-        const result = await prisma.$transaction(async (tx) => {
-          const user = await tx.user.create({
-            data: { email, name, emailVerified: true },
-          });
-          const org = await tx.organization.create({
-            data: {
-              name: `${name}'s Store`,
-              slug: email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now(),
-            },
-          });
-          const uo = await tx.userOrganization.create({
-            data: {
-              userId: user.id,
-              organizationId: org.id,
-              role: 'owner',
-            },
-          });
-          return { user, org, uo };
-        });
-
-        return {
-          userId: result.user.id,
-          organizationId: result.org.id,
-          role: 'owner' as Role,
-          permissions: ROLE_PERMISSIONS['owner'],
-          email: result.user.email,
-          name: result.user.name ?? undefined,
-        };
-      }
-
-      return {
-        userId: userOrg.userId,
-        organizationId: userOrg.organizationId,
-        role: userOrg.role as Role,
-        permissions: userOrg.permissions.length > 0
-          ? userOrg.permissions
-          : ROLE_PERMISSIONS[userOrg.role as Role] || [],
-        email: userOrg.user.email,
-        name: userOrg.user.name ?? undefined,
-      };
-    }
-  } catch (e) {
-    // Supabase session check failed — continue to return null
-  }
-
-  return null;
 }
 
 export async function getApiAuthFromRequest(req: NextRequest): Promise<ApiAuthContext | null> {

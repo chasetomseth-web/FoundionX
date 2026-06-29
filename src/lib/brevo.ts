@@ -4,7 +4,19 @@
  */
 
 const BREVO_API_BASE = 'https://api.brevo.com/v3';
-const BREVO_API_KEY = process.env.BREVO_API_KEY!;
+let BREVO_API_KEY: string | null = null;
+
+function getBrevoApiKey(): string | null {
+  if (BREVO_API_KEY === null) {
+    const key = process.env.BREVO_API_KEY;
+    if (key && key.length > 10 && !key.startsWith('your-') && !key.includes('placeholder')) {
+      BREVO_API_KEY = key;
+    } else {
+      BREVO_API_KEY = '';
+    }
+  }
+  return BREVO_API_KEY || null;
+}
 
 interface BrevoContact {
   email: string;
@@ -29,10 +41,14 @@ async function brevoRequest<T>(
   path: string,
   body?: Record<string, unknown>
 ): Promise<T> {
+  const apiKey = getBrevoApiKey();
+  if (!apiKey) {
+    throw new Error('Brevo API key not configured');
+  }
   const res = await fetch(`${BREVO_API_BASE}${path}`, {
     method,
     headers: {
-      'api-key': BREVO_API_KEY,
+      'api-key': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },

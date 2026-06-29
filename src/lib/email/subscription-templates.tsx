@@ -1,7 +1,13 @@
 import { Resend } from 'resend';
 import * as React from 'react';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (key && key.length > 10 && !key.startsWith('your-') && !key.includes('placeholder')) {
+    return new Resend(key);
+  }
+  return null;
+}
 
 interface EmailTemplateProps {
   customerName: string;
@@ -360,6 +366,11 @@ export const sendSubscriptionEmail = async (
   const template = templates[emailType];
   if (!template) {
     throw new Error(`Unknown email template: ${emailType}`);
+  }
+
+  const resend = getResendClient();
+  if (!resend) {
+    throw new Error('Resend not configured');
   }
 
   try {

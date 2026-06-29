@@ -12,7 +12,13 @@ async function getStripe() {
   }
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (key && key.length > 10 && !key.startsWith('your-') && !key.includes('placeholder')) {
+    return new Resend(key);
+  }
+  return null;
+}
 
 export async function POST(
   request: NextRequest,
@@ -85,47 +91,49 @@ export async function POST(
         year: 'numeric',
       });
 
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
-        to: subscription.customer.email,
-        subject: `Your ${subscription.planName} has been delayed`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #667eea; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-                .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
-                .highlight { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0; }
-                .footer { background: #f9fafb; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #6b7280; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h1>✓ Subscription Delayed</h1>
-                </div>
-                <div class="content">
-                  <p>Hi ${subscription.customer.name || 'there'},</p>
-                  <p>Your <strong>${subscription.planName}</strong> subscription has been successfully delayed by ${weeks} weeks.</p>
-                  <div class="highlight">
-                    <strong>New Billing Date:</strong> ${formattedDate}
+      const resend = getResendClient();
+      if (resend) {
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || 'noreply@merchantos.com',
+          to: subscription.customer.email,
+          subject: `Your ${subscription.planName} has been delayed`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background: #667eea; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                  .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+                  .highlight { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0; }
+                  .footer { background: #f9fafb; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 14px; color: #6b7280; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>✓ Subscription Delayed</h1>
                   </div>
-                  <p>Your next order will ship on this new date. You can manage your subscription anytime from your portal.</p>
+                  <div class="content">
+                    <p>Hi ${subscription.customer.name || 'there'},</p>
+                    <p>Your <strong>${subscription.planName}</strong> subscription has been successfully delayed by ${weeks} weeks.</p>
+                    <div class="highlight">
+                      <strong>New Billing Date:</strong> ${formattedDate}
+                    </div>
+                    <p>Your next order will ship on this new date. You can manage your subscription anytime from your portal.</p>
+                  </div>
+                  <div class="footer">
+                    <p>Questions? Contact our support team.</p>
+                  </div>
                 </div>
-                <div class="footer">
-                  <p>Questions? Contact our support team.</p>
-                </div>
-              </div>
-            </body>
-          </html>
-        `,
-      });
+              </body>
+            </html>
+          `,
+        });
+      }
     } catch (emailError) {
-      // Silent failure for email
       console.error('Email send error:', emailError);
     }
 
