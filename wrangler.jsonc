@@ -1,10 +1,10 @@
 {
-  "name": "wiastro-foundiox",
+  "$schema": "node_modules/wrangler/config-schema.json",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2025-06-01",
+  "name": "wiastro-foundiox",
+  "compatibility_date": "2026-06-28",
   "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
+    "nodejs_compat"
   ],
   "assets": {
     "directory": ".open-next/assets",
@@ -13,17 +13,13 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "wiastro-foundiox"
+      "service": "merchantos"
     }
   ],
-  "routes": [
-    {
-      "pattern": "wiastro.com",
-      "custom_domain": true
-    },
-    {
-      "pattern": "www.wiastro.com",
-      "custom_domain": true
-    }
-  ]
+  "images": {
+    "binding": "IMAGES"
+  },
+  "observability": {
+    "enabled": true
+  }
 }

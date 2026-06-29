@@ -21,3 +21,4 @@ const nextConfig = {
   serverExternalPackages: ['@prisma/client', 'prisma']
 };
 export default nextConfig;
+import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());
