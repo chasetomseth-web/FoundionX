@@ -1,6 +1,4 @@
-'use client';
-
-import AppLogo from '@/components/ui/AppLogo';
+import Image from 'next/image';
 import { CheckCircle2, Zap, BarChart3, Link2 } from 'lucide-react';
 
 const features = [
@@ -22,14 +20,26 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
         <div className="w-full max-w-3xl">
           <div className="flex flex-col items-center text-center mb-10">
-            <AppLogo size={48} className="mb-6" />
+            <div className="mb-6">
+              <Image
+                src="/Images/WiAstro%20Logo.png"
+                alt="wiastro logo"
+                width={96}
+                height={96}
+                priority
+                className="mx-auto h-12 w-12"
+              />
+            </div>
+
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-500 w-fit mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
               Platform status: All systems operational
             </span>
+
             <h1 className="text-4xl xl:text-5xl font-800 text-foreground leading-tight mb-4">
               Your entire store.<br />One dashboard.
             </h1>
+
             <p className="text-base text-muted-foreground leading-relaxed max-w-xl">
               wiastro replaces Shopify, GoAffPro, and Brevo with a single, fast operating system built for modern e-commerce merchants.
             </p>
@@ -66,3 +76,4 @@ export default function Home() {
     </div>
   );
 }
+

@@ -9,6 +9,10 @@ import { runStripeReconciliation, getReconciliationHistory } from '@/lib/stripe-
 import { apiLogger, getCorrelationId } from '@/lib/observability';
 
 export async function GET(req: NextRequest) {
+  // Avoid breaking production build/startup when admin secrets aren't configured.
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.API_KEY) {
+    return NextResponse.json({ error: 'Admin reconciliation is disabled' }, { status: 503 });
+  }
   const correlationId = getCorrelationId(req);
   const { searchParams } = new URL(req.url);
   const organizationId = searchParams.get('organizationId') ?? undefined;
@@ -24,6 +28,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Avoid breaking production build/startup when admin secrets aren't configured.
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.API_KEY) {
+    return NextResponse.json({ error: 'Admin reconciliation is disabled' }, { status: 503 });
+  }
   const correlationId = getCorrelationId(req);
 
   try {

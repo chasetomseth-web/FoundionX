@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
-  '/sign-up-login-screen',
+  // Keep landing page public
+  '/',
+  // Allow OAuth callback flow and basic auth-related webhooks
   '/auth/callback',
   '/api/auth',
   '/api/webhooks',
   '/api/storefront/render',
   '/api/health',
-  '/portal/login',
-  '/portal/create-account',
   '/render',
 ];
 
@@ -56,10 +56,34 @@ export async function middleware(req: NextRequest) {
   }
 
   // ── Public Routes ────────────────────────────────────────────────────────
-  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) || pathname === '/';
+  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(route)) || pathname === '/';
   if (isPublicRoute) {
     return response;
   }
+
+  // ── Block login/signup pages (site live; prevent random logins) ─────────────
+  const isLoginPage =
+    pathname.startsWith('/sign-up-login-screen') ||
+    pathname.startsWith('/portal/login') ||
+    pathname.startsWith('/portal/create-account') ||
+    pathname.startsWith('/affiliate-portal/login') ||
+    pathname.startsWith('/affiliate-portal/create-account') ||
+    pathname.startsWith('/owner/login');
+
+  if (isLoginPage) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
+  // ── Block customer login/signup API endpoints ───────────────────────────────
+  if (
+    pathname === '/api/auth/customer/login' ||
+    pathname === '/api/auth/customer/signup' ||
+    pathname === '/api/auth/login' ||
+    pathname === '/api/auth/signup'
+  ) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
 
   // ── Customer Portal Protection ──────────────────────────────────────────
   const isCustomerRoute = CUSTOMER_PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
